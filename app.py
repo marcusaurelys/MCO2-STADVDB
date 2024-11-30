@@ -40,8 +40,8 @@ elif action == "Add Game":
         price = st.number_input("Price ($)", min_value=0.0, format="%.2f")
         developers = st.text_input("Developers")
         publishers = st.text_input("Publishers")
-        languages = st.text_input("Languages (comma-separated)")
-        genres = st.text_input("Genres (comma-separated)")
+        languages = st.text_input("Languages (comma-separated, up to 3)")
+        genres = st.text_input("Genres (comma-separated, up to 3)")
         platforms = st.multiselect("Platforms", ["Windows", "Mac", "Linux"])
         submitted = st.form_submit_button("Add Game")
 
