@@ -51,8 +51,8 @@ elif action == "Add Game":
             linux = "Linux" in platforms
 
             insert_query = """
-                INSERT INTO games (Name, Price, Developers, Publishers, `Language 1`, `Genre 1`, Windows, Mac, Linux)
-                VALUES (:name, :price, :developers, :publishers, :language_1, :genre_1, :windows, :mac, :linux);
+                INSERT INTO games (Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux)
+                VALUES (:name, :price, :developers, :publishers, :language_1, :language_2, :language_3, :genre_1, :genre_2, :genre_3, :windows, :mac, :linux);
             """
             params = {
                 "name": name,
@@ -60,7 +60,11 @@ elif action == "Add Game":
                 "developers": developers,
                 "publishers": publishers,
                 "language_1": languages.split(",")[0] if languages else None,
+                "language_2": languages.split(",")[1] if len(languages.split(",")) >= 2 else None,
+                "language_3": languages.split(",")[2] if len(languages.split(",")) >= 3 else None,
                 "genre_1": genres.split(",")[0] if genres else None,
+                "genre_2": genres.split(",")[1] if len(genres.split(",")) >= 2 else None,
+                "genre_3": genres.split(",")[2] if len(genres.split(",")) >= 3 else None,
                 "windows": windows,
                 "mac": mac,
                 "linux": linux,
@@ -76,7 +80,7 @@ elif action == "Add Game":
 elif action == "Update Game":
     st.header("✏️ Update Game Information")
     game_id = st.number_input("Enter the AppID of the game to update", min_value=1, step=1)
-
+    platform_options = ["Windows", "Mac", "Linux"]
     
     query = "SELECT * FROM games WHERE AppID = %s;"
     try:
@@ -88,17 +92,30 @@ elif action == "Update Game":
                 price = st.number_input("Price ($)", min_value=0.0, format="%.2f", value=game_to_update.iloc[0]["Price"])
                 developers = st.text_input("Developers", value=game_to_update.iloc[0]["Developers"])
                 publishers = st.text_input("Publishers", value=game_to_update.iloc[0]["Publishers"])
+                language_1 = st.text_input("Language 1", value=game_to_update.iloc[0]["Language 1"])
+                language_2 = st.text_input("Language 2", value=game_to_update.iloc[0]["Language 2"])
+                language_3 = st.text_input("Language 3", value=game_to_update.iloc[0]["Language 3"])
+                genre_1 = st.text_input("Genre 1", value=game_to_update.iloc[0]["Genre 1"])
+                genre_2 = st.text_input("Genre 2", value=game_to_update.iloc[0]["Genre 2"])
+                genre_3 = st.text_input("Genre 3", value=game_to_update.iloc[0]["Genre 3"])
+                platforms = st.multiselect("Platforms", platform_options, [name for name in platform_options if game_to_update.iloc[0][name]])
+
                 submitted = st.form_submit_button("Update Game")
 
                 if submitted:
                     update_query = """
                         UPDATE games
-                        SET Name = %s, Price = %s, Developers = %s, Publishers = %s
-                        WHERE AppID = %s;
+                        SET Name = %s, Price = %s, Developers = %s, Publishers = %s, Windows = %s, Mac = %s, Linux = %s, `Language 1`= %s, `Language 2` = %s, `Language 3` = %s, `Genre 1` = %s, `Genre 2` = %s, `Genre 3` = %s
+                        WHERE AppID = %s;       
                     """
-                    params = (name, price, developers, publishers, game_id)
+
+                    windows = "Windows" in platforms
+                    mac = "Mac" in platforms
+                    linux = "Linux" in platforms
+
+                    params = (name, price, developers, publishers, windows, mac, linux, language_1, language_2, language_3, genre_1, genre_2, genre_3, game_id)
                     with engine.connect() as conn:
-                        conn.execute(text(update_query), params)
+                        conn.execute(update_query, params)
                     st.success("Game updated successfully!")
         else:
             st.warning("No game found with the provided AppID.")
