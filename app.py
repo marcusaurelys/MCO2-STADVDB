@@ -146,9 +146,10 @@ elif action == "Update Game":
             raise Exception(response['message'])
 
         game_to_update = pd.DataFrame(response['results'])
-        
+     
         if not game_to_update.empty:
             st.write("Editing Game:", game_to_update.iloc[0]["Name"])
+            game_to_update['Price'] = pd.to_numeric(game_to_update['Price'], errors='coerce')
             with st.form("update_game_form"):
                 name = st.text_input("Game Name", value=game_to_update.iloc[0]["Name"])
                 price = st.number_input("Price ($)", min_value=0.0, format="%.2f", value=game_to_update.iloc[0]["Price"])
@@ -161,7 +162,6 @@ elif action == "Update Game":
                 genre_2 = st.text_input("Genre 2", value=game_to_update.iloc[0]["Genre 2"])
                 genre_3 = st.text_input("Genre 3", value=game_to_update.iloc[0]["Genre 3"])
                 platforms = st.multiselect("Platforms", platform_options, [name for name in platform_options if game_to_update.iloc[0][name]])
-
                 submitted = st.form_submit_button("Update Game")
 
                 if submitted:
@@ -188,15 +188,16 @@ elif action == "Update Game":
                             "windows": windows,
                             "mac": mac,
                             "linux": linux,
-                            "language_1": languages.split(",")[0] if languages else None,
-                            "language_2": languages.split(",")[1] if len(languages.split(",")) >= 2 else None,
-                            "language_3": languages.split(",")[2] if len(languages.split(",")) >= 3 else None,
-                            "genre_1": genres.split(",")[0] if genres else None,
-                            "genre_2": genres.split(",")[1] if len(genres.split(",")) >= 2 else None,
-                            "genre_3": genres.split(",")[2] if len(genres.split(",")) >= 3 else None,
+                            "language_1": language_1,
+                            "language_2": language_2,
+                            "language_3": language_3,
+                            "genre_1": genre_1,
+                            "genre_2": genre_2,
+                            "genre_3": genre_3,
                             "AppID": game_id
                         }
-                        
+
+                        game_to_update['Release date'] = pd.to_datetime(game_to_update['Release date'], errors='coerce').dt.year
                         if game_to_update.iloc[0]['Release date'] < 2020:
                             tx1 = {
                                 "query": query,
@@ -259,7 +260,7 @@ elif action == "Delete Game":
         if response['status'] != "success":
             raise Exception(response['message'])
 
-        game_to_delete = pd.Dataframe(response['results'])
+        game_to_delete = pd.DataFrame(response['results'])
         
     except Exception as e:
          st.error(f"Error: {str(e)}")
@@ -268,7 +269,9 @@ elif action == "Delete Game":
         query = "DELETE FROM games WHERE AppID = %s"
         try:
             if game_to_delete.empty:
-                raise Empty()
+                raise ValueError()
+
+            game_to_delete['Release date'] = pd.to_datetime(game_to_delete['Release date'], errors='coerce').dt.year
             endpoint = url + '/write'
             tx1 = {}
             tx2 = {}
@@ -276,7 +279,7 @@ elif action == "Delete Game":
                 "AppID": game_id
             }
             
-            if game_to_update.iloc[0]['Release date'] < 2020:
+            if game_to_delete.iloc[0]['Release date'] < 2020:
                 tx1 = {
                     "query": query,
                     "params": params,
@@ -311,7 +314,7 @@ elif action == "Delete Game":
 
             st.success("Game queued for deletion")
 
-        except Empty as e:
+        except ValueError as e:
             st.warning("No game found with the provided AppID.")
         except Exception as e:
             st.error(f"Error: {str(e)}")
