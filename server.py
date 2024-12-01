@@ -115,14 +115,14 @@ def acquire_lock(timeout):
 
            if (time.time() - timestamp) > timeout:
                raise TimeoutError(f"Timeout acquiring lock")
+
+           time.sleep(1)
            
         except Exception as e:
             print(f"Failed to acquire lock: {e}")
             
             if time.time() - start_time > timeout:
                 raise TimeoutError(f"Timeout acquiring lock")
-
-            time.sleep(1)
             
         finally:
             cursor.close()
@@ -136,7 +136,7 @@ def release_lock():
     WHERE lock_name = %s  
     """
     
-    connection = get_node1_connection
+    connection = get_node1_connection()
     cursor = connection.cursor()
 
     cursor.execute(delete_lock, ("database_lock"))
@@ -190,7 +190,7 @@ def process_queue():
             if not success:
                 # Re-enqueue if transaction failed
                 transaction['retries'] += 1
-                if transaction['retries'] <= 3:  # Retry limit
+                if transaction['retries'] <= 100000:  # To improve: rollback all transca
                     transaction_queue.put(transaction)
                 else:
                     print(f"Transaction failed after retries: {transaction}")
