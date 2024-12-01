@@ -1,15 +1,9 @@
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine, text
+import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
-from sqlalchemy.exc import SQLAlchemyError
-
-user = st.secrets['USER']
-password = st.secrets['PASSWORD']
-host = st.secrets['HOST']
-database = 'games'
-port = st.secrets['PRIMARY_PORT']
-engine = create_engine(f'mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}')
+ 
+url = st.secrets['url']
 
 st.set_page_config(page_title="Steam Games Management System", page_icon=":video_game:", layout="wide")
 st.title("🎮 Steam Games Management System")
@@ -27,16 +21,27 @@ if action == "View Games":
         FROM games;
     """
     try:
-        games_df = pd.read_sql(query, engine)
+        endpoint = url + '/select'
+        data = {
+            "query": query,
+            "target_node": "node1"
+        }
+        response = requests.post(endpoint, json=data)
+        response = response.json()
+
+        if response['status'] != "success":
+            raise Exception(response['message'])
+
+        games_df = pd.DataFrame(response['results'])
         AgGrid(games_df, width=150)
-    except SQLAlchemyError as e:
+    except Exception as e:
         st.error(f"Error: {str(e)}")
 
 #create operation
 elif action == "Add Game":
     st.header("➕ Add a New Game")
     with st.form("add_game_form", clear_on_submit=True):
-        id = st.number_inpu("App ID")
+        id = st.number_input("App ID")
         name = st.text_input("Game Name")
         price = st.number_input("Price ($)", min_value=0.0, format="%.2f")
         developers = st.text_input("Developers")
@@ -44,6 +49,7 @@ elif action == "Add Game":
         languages = st.text_input("Languages (comma-separated, up to 3)")
         genres = st.text_input("Genres (comma-separated, up to 3)")
         platforms = st.multiselect("Platforms", ["Windows", "Mac", "Linux"])
+        release_date = st.date_input()
         submitted = st.form_submit_button("Add Game")
 
         if submitted:
@@ -52,9 +58,10 @@ elif action == "Add Game":
             linux = "Linux" in platforms
 
             insert_query = """
-                INSERT INTO games (AppID, Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux)
-                VALUES (:id, :name, :price, :developers, :publishers, :language_1, :language_2, :language_3, :genre_1, :genre_2, :genre_3, :windows, :mac, :linux);
+                INSERT INTO games (AppID, Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux, `Release date`)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             """
+            
             params = {
                 "id" : id,
                 "name": name,
@@ -70,12 +77,49 @@ elif action == "Add Game":
                 "windows": windows,
                 "mac": mac,
                 "linux": linux,
+                "release_date": release_date
             }
+
             try:
-                with engine.connect() as conn:
-                    conn.execute(text(insert_query), params)
-                st.success(f"Game '{name}' added successfully!")
-            except SQLAlchemyError as e:
+                endpoint = url + '/write'
+                tx1 = {}
+                tx2 = {}
+    
+                if params['release_date'] < 2020:
+                    tx1 = {
+                        "query": query,
+                        "params": params,
+                        "target_node": "node1"
+                    }
+
+                    tx2 = {
+                        "query": query,
+                        "params": params,
+                        "target_node": "node2"
+                    }
+                else:
+                    tx1 = {
+                        "query": query,
+                        "params": params,
+                        "target_node": "node1"
+                    }
+
+                    tx2 = {
+                        "query": query,
+                        "params": params,
+                        "target_node": "node3"
+                    }
+
+                transactions = [tx1, tx2]
+                
+                response = requests.post(endpoint, json=transactions)
+                response = response.json()
+
+                if response['status'] != "queued":
+                    raise Exception(response['message'])
+            
+                st.success(f"Game '{name}' added to queue!")
+            except Exception as e:
                 st.error(f"Error: {str(e)}")
 
 # update operation
@@ -86,7 +130,20 @@ elif action == "Update Game":
     
     query = "SELECT * FROM games WHERE AppID = %s;"
     try:
-        game_to_update = pd.read_sql(query, engine, params=(game_id,))
+        endpoint = url + '/select'
+        data = {
+            "query": query,
+            "params": game_id,
+            "target_node": "node1"
+        }
+        response = requests.post(endpoint, json=data)
+        response = response.json()
+
+        if response['status'] != "success":
+            raise Exception(response['message'])
+
+        game_to_update = pd.DataFrame(response['results'])
+        
         if not game_to_update.empty:
             st.write("Editing Game:", game_to_update.iloc[0]["Name"])
             with st.form("update_game_form"):
@@ -105,7 +162,7 @@ elif action == "Update Game":
                 submitted = st.form_submit_button("Update Game")
 
                 if submitted:
-                    update_query = """
+                    query = """
                         UPDATE games
                         SET Name = %s, Price = %s, Developers = %s, Publishers = %s, Windows = %s, Mac = %s, Linux = %s, `Language 1`= %s, `Language 2` = %s, `Language 3` = %s, `Genre 1` = %s, `Genre 2` = %s, `Genre 3` = %s
                         WHERE AppID = %s;       
@@ -114,30 +171,144 @@ elif action == "Update Game":
                     windows = "Windows" in platforms
                     mac = "Mac" in platforms
                     linux = "Linux" in platforms
+                    
+                    try:
+                        endpoint = url + '/write'
+                        tx1 = {}
+                        tx2 = {}
 
-                    params = (name, price, developers, publishers, windows, mac, linux, language_1, language_2, language_3, genre_1, genre_2, genre_3, game_id)
-                    with engine.connect() as conn:
-                        conn.execute(update_query, params)
-                    st.success("Game updated successfully!")
-        else:
-            st.warning("No game found with the provided AppID.")
-    except SQLAlchemyError as e:
+                        params = {
+                            "name": name,
+                            "price": price,
+                            "developers": developers,
+                            "publishers": publishers,
+                            "windows": windows,
+                            "mac": mac,
+                            "linux": linux,
+                            "language_1": languages.split(",")[0] if languages else None,
+                            "language_2": languages.split(",")[1] if len(languages.split(",")) >= 2 else None,
+                            "language_3": languages.split(",")[2] if len(languages.split(",")) >= 3 else None,
+                            "genre_1": genres.split(",")[0] if genres else None,
+                            "genre_2": genres.split(",")[1] if len(genres.split(",")) >= 2 else None,
+                            "genre_3": genres.split(",")[2] if len(genres.split(",")) >= 3 else None,
+                            "AppID": game_id
+                        }
+                        
+                        if game_to_update.iloc[0]['Release date'] < 2020:
+                            tx1 = {
+                                "query": query,
+                                "params": params,
+                                "target_node": "node1"
+                            }
+
+                            tx2 = {
+                                "query": query,
+                                "params": params,
+                                "target_node": "node2"
+                            }
+                        else:
+                            tx1 = {
+                                "query": query,
+                                "params": params,
+                                "target_node": "node1"
+                            }
+
+                            tx2 = {
+                                "query": query,
+                                "params": params,
+                                "target_node": "node3"
+                            }
+
+                        transactions = [tx1, tx2]
+                
+                        response = requests.post(endpoint, json=transactions)
+                        response = response.json()
+
+                        if response['status'] != "queued":
+                            raise Exception(response['message'])
+
+                        st.success("Game update added to queue!")
+                        
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+                        
+    except Exception as e:
         st.error(f"Error: {str(e)}")
 
-
+                                 
 # delete operation
 elif action == "Delete Game":
     st.header("🗑️ Delete a Game")
     game_id = st.number_input("Enter the AppID of the game to delete", min_value=1, step=1)
+    game_to_delete = None
+    query = "SELECT * FROM games WHERE AppID = %s;"
+    
+    try:
+        endpoint = url + '/select'
+        data = {
+            "query": query,
+            "params": game_id,
+            "target_node": "node1"
+        }
+        response = requests.post(endpoint, json=data)
+        response = response.json()
 
+        if response['status'] != "success":
+            raise Exception(response['message'])
+
+        game_to_delete = pd.Dataframe(response['results'])
+        
+    except Exception as e:
+         st.error(f"Error: {str(e)}")
+    
     if st.button("Delete Game"):
-        delete_query = "DELETE FROM games WHERE AppID = :game_id;"
+        query = "DELETE FROM games WHERE AppID = %s"
         try:
-            with engine.connect() as conn:
-                result = conn.execute(text(delete_query), {"game_id": game_id})
-                if result.rowcount > 0:
-                    st.success("Game deleted successfully!")
-                else:
-                    st.warning("No game found with the provided AppID.")
-        except SQLAlchemyError as e:
+            if game_to_delete.empty:
+                raise Empty()
+            endpoint = url + '/write'
+            tx1 = {}
+            tx2 = {}
+            params = {
+                "AppID": game_id
+            }
+            
+            if game_to_update.iloc[0]['Release date'] < 2020:
+                tx1 = {
+                    "query": query,
+                    "params": params,
+                    "target_node": "node1"
+                }
+
+                tx2 = {
+                    "query": query,
+                    "params": params,
+                    "target_node": "node2"
+                }
+            else:
+                tx1 = {
+                    "query": query,
+                    "params": params,
+                    "target_node": "node1"
+                }
+
+                tx2 = {
+                    "query": query,
+                    "params": params,
+                    "target_node": "node3"
+                }
+
+            transactions = [tx1, tx2]
+    
+            response = requests.post(endpoint, json=transactions)
+            response = response.json()
+
+            if response['status'] != "queued":
+                raise Exception(response['message'])
+
+            st.success("Game queued for deletion")
+
+        except Empty as e:
+            st.warning("No game found with the provided AppID.")
+        except Exception as e:
             st.error(f"Error: {str(e)}")

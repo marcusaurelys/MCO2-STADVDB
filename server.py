@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, request, jsonify
 import pymysql
 
 from dotenv import load_dotenv
@@ -8,6 +8,7 @@ import time
 import threading
 import queue
 
+load_dotenv()
 current_node = os.getenv('current_node')
 
 node1_host = "10.2.204"
@@ -30,6 +31,7 @@ def get_node1_connection():
             host=node1_host,
             user=node1_user,
             password=node1_user,
+            database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
         )
@@ -45,6 +47,7 @@ def get_node2_connection():
             host=node2_host,
             user=node2_user,
             password=node2_user,
+            database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
         )
@@ -59,6 +62,7 @@ def get_node3_connection():
             host=node3_host,
             user=node3_user,
             password=node3_user,
+            database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False)
         return connection3
@@ -90,14 +94,14 @@ def acquire_lock(timeout):
            connection = get_node1_connection()
            cursor = connection.cursor()
 
-           cursor.execute(select_lock, (lock))
+           cursor.execute(select_lock, (lock,))
            result = cursor.fetchone()
 
            if result is None:
                cursor.execute(insert_lock, (lock, current_node))
                connection.commit()
                print(f"Lock acquired by {current_node}")
-               return
+               return True
            else:
                locked_by = result['locked_by']
                timestamp = result['timestamp']
@@ -105,16 +109,16 @@ def acquire_lock(timeout):
                if (time.time() - timestamp) > timeout:
                    cursor.execute(update_lock, (current_node, lock))
                    connection.commit()
-                   cursor.execute(select_lock, (lock))
+                   cursor.execute(select_lock, (lock,))
                    result = cursor.fetchone()
 
                    # Check if we actually acquired the lock
                    if current_node == result['locked_by']:
                        print(f"Lock expired and acquired by {current_node}")
-                       return
+                       return True
 
            if (time.time() - timestamp) > timeout:
-               raise TimeoutError(f"Timeout acquiring lock")
+               return False
 
            time.sleep(1)
            
@@ -122,7 +126,7 @@ def acquire_lock(timeout):
             print(f"Failed to acquire lock: {e}")
             
             if time.time() - start_time > timeout:
-                raise TimeoutError(f"Timeout acquiring lock")
+                return False
             
         finally:
             cursor.close()
@@ -139,7 +143,7 @@ def release_lock():
     connection = get_node1_connection()
     cursor = connection.cursor()
 
-    cursor.execute(delete_lock, ("database_lock"))
+    cursor.execute(delete_lock, ("database_lock",))
     connection.commit()
 
     print(f"Lock released by {current_node}")
@@ -156,7 +160,7 @@ def check_lock():
         connection = get_node1_connection()
         cursor = connection.cursor()
 
-        cursor.execute(select_lock, (lock))
+        cursor.execute(select_lock, (lock,))
         result = cursor.fetchone()
 
         if result is None:
@@ -209,7 +213,7 @@ def execute_transaction(transaction):
         else:
             connection = get_node3_connection()
             
-        cursor.execute(transaction['query'], transaction.get('params', ()))
+        cursor.execute(transaction['query'], tuple(transaction['params'].values()))
         conn.commit()
         cursor.close()
         conn.close()
@@ -230,7 +234,8 @@ def execute_query(node, query, params=()):
             connection = get_node3_connection()
 
         cursor = connection.cursor()
-        cursor.execute(query, params)
+        # Params is a single value that we tuple
+        cursor.execute(query, (params,))
         results = cursor.fetchall()
         cursor.close()
         connection.close()
