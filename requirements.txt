@@ -1,6 +1,6 @@
 python-dotenv
 flask
 pymysql
-streamit
+streamlit
 pandas
-streamlit-agrid
+streamlit-aggrid

@@ -52,7 +52,8 @@ def get_node2_connection():
         connection2 = pymysql.connect(
             host=node2_host,
             user=node2_user,
-            password=node2_user,
+            password=node2_password,
+            port=node2_port,
             database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
@@ -67,7 +68,8 @@ def get_node3_connection():
         connection3 = pymysql.connect(
             host=node3_host,
             user=node3_user,
-            password=node3_user,
+            password=node3_password,
+            port=node3_port,
             database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False)
@@ -145,7 +147,8 @@ def release_lock():
     DELETE from distributed_lock
     WHERE lock_name = %s  
     """
-    
+
+    print("trying to release lock")
     connection = get_node1_connection()
     cursor = connection.cursor()
 
@@ -161,7 +164,7 @@ def check_lock():
     SELECT locked_by, lock_time FROM distributed_lock
     WHERE lock_name = %s
     """
-
+    print("checking lock")
     try:
         connection = get_node1_connection()
         cursor = connection.cursor()
@@ -182,22 +185,20 @@ transaction_queue = queue.Queue()
 
 is_processing = False
 is_processing_lock = threading.Lock()
+worker_thread = None
+worker_thread_running = False
 
 def process_queue():
-    global is_processing
-    global is_processing_lock
-    print(transaction_queue.size())
+    global is_processing, worker_thread_running
+    print("In queue")
+    
     while True:
         with is_processing_lock:
-            is_processing = False if transaction_queue.empty() else True
+            is_processing = not transaction_queue.empty()
 
-        if is_processing and not transaction_queue.empty():
+        if is_processing:
            
             transaction = transaction_queue.get()
-            if transaction is None:
-                release_lock()
-                continue
-
             success = execute_transaction(transaction)
             if not success:
                 # Re-enqueue if transaction failed
@@ -211,11 +212,10 @@ def process_queue():
         with is_processing_lock:
             is_processing = not transaction_queue.empty()  
         
-        with is_processing_lock:
-            if not is_processing:
-                release_lock()
-
-
+        if not is_processing:
+            release_lock()
+            worker_thread_running = False
+            break
     
 def execute_transaction(transaction):
     try:
@@ -225,7 +225,7 @@ def execute_transaction(transaction):
             connection = get_node2_connection()
         else:
             connection = get_node3_connection()
-        print(transaction)
+
         cursor = connection.cursor()    
         cursor.execute(transaction['query'], tuple(transaction['params'].values()))
         connection.commit()
@@ -267,7 +267,7 @@ def execute_query(node, query, params=()):
 app = Flask(__name__)
 @app.route('/write', methods=['POST'])
 def add_transaction():
-    global is_processing
+    global worker_thread_running, worker_thread
 
     with is_processing_lock:
         if is_processing:
@@ -288,6 +288,11 @@ def add_transaction():
                 "retries": 0
             }
             transaction_queue.put(tx)
+
+        if not worker_thread_running:
+            worker_thread_running = True
+            worker_thread = threading.Thread(target=process_queue, daemon=True)
+            worker_thread.start()
             
         return jsonify({"status": "queued", "transaction": transaction}), 200
     except Exception as e:
@@ -313,14 +318,19 @@ def run_query():
         return jsonify({"status": "error", "message": "Query and target node are required"}), 400
 
     if check_lock():
-        print(params)
         result = execute_query(target_node, query, params)
         return jsonify(result), 200 if result['status'] == 'success' else 500
     else:
         return jsonify({"status": "error", "message": "Database is currently syncing"}), 500
-
-if __name__ == '__main__':
-    worker_thread = threading.Thread(target=process_queue, daemon=True)
+    
+@app.route('/testing', methods=['GET'])
+def testing():
+    worker_thread = threading.Thread(target=test, daemon=True)
     worker_thread.start()
 
+def test():
+    while True:
+        print("test")
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

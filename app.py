@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 import traceback
  
 url = st.secrets['url']
@@ -35,7 +34,7 @@ if action == "View Games":
 
         games_df = pd.DataFrame(response['results'])
         games_df = games_df[['AppID', 'Name', 'Price', 'Developers', 'Publishers', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']]
-        AgGrid(games_df, width=150)
+        st.dataframe(games_df)
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
