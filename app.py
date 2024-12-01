@@ -36,6 +36,7 @@ if action == "View Games":
 elif action == "Add Game":
     st.header("➕ Add a New Game")
     with st.form("add_game_form", clear_on_submit=True):
+        id = st.number_inpu("App ID")
         name = st.text_input("Game Name")
         price = st.number_input("Price ($)", min_value=0.0, format="%.2f")
         developers = st.text_input("Developers")
@@ -51,10 +52,11 @@ elif action == "Add Game":
             linux = "Linux" in platforms
 
             insert_query = """
-                INSERT INTO games (Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux)
-                VALUES (:name, :price, :developers, :publishers, :language_1, :language_2, :language_3, :genre_1, :genre_2, :genre_3, :windows, :mac, :linux);
+                INSERT INTO games (AppID, Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux)
+                VALUES (:id, :name, :price, :developers, :publishers, :language_1, :language_2, :language_3, :genre_1, :genre_2, :genre_3, :windows, :mac, :linux);
             """
             params = {
+                "id" : id,
                 "name": name,
                 "price": price,
                 "developers": developers,
