@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
 import pymysql
+import traceback
 
 from dotenv import load_dotenv
 import os
 
+import datetime
 import time
 import threading
 import queue
@@ -11,16 +13,19 @@ import queue
 load_dotenv()
 current_node = os.getenv('current_node')
 
-node1_host = "10.2.204"
+node1_host = "ccscloud.dlsu.edu.ph"
+node1_port = 22042
 node1_user = "user"
 node1_password = "password"
 
-node2_host = "10.2.205"
+node2_host = "ccscloud.dlsu.edu.ph"
 node2_user = "user"
+node2_port = 22052
 node2_password = "password"
 
-node3_host = "10.2.206"
+node3_host = "ccscloud.dlsu.edu.ph"
 node3_user = "user"
+node3_port = 22062
 node3_password = "password"
 
 ##### Connections
@@ -30,7 +35,8 @@ def get_node1_connection():
         connection1 = pymysql.connect(
             host=node1_host,
             user=node1_user,
-            password=node1_user,
+            port=node1_port,
+            password=node1_password,
             database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
@@ -76,16 +82,16 @@ def acquire_lock(timeout):
     start_time = time.time()
     lock = "database_lock"
     select_lock = """
-    SELECT locked_by, timestamp FROM distributed_lock
-    WHERE lock_name is = %s
+    SELECT locked_by, lock_time FROM distributed_lock
+    WHERE lock_name = %s
     """
     insert_lock = """
     INSERT INTO distributed_lock (lock_name, locked_by)
-    VALUES (?, ?)
+    VALUES (%s, %s)
     """
     update_lock = """
     UPDATE distributed_lock
-    SET locked_by = %s, timestamp = NOW()
+    SET locked_by = %s, lock_time = NOW()
     WHERE lock_name = %s        
     """
 
@@ -104,9 +110,9 @@ def acquire_lock(timeout):
                return True
            else:
                locked_by = result['locked_by']
-               timestamp = result['timestamp']
+               timestamp = result['lock_time']
 
-               if (time.time() - timestamp) > timeout:
+               if (time.time() - timestamp.timestamp()) > timeout:
                    cursor.execute(update_lock, (current_node, lock))
                    connection.commit()
                    cursor.execute(select_lock, (lock,))
@@ -152,8 +158,8 @@ def check_lock():
     
     lock = "database_lock"
     select_lock = """
-    SELECT locked_by, timestamp FROM distributed_lock
-    WHERE lock_name is = %s
+    SELECT locked_by, lock_time FROM distributed_lock
+    WHERE lock_name = %s
     """
 
     try:
@@ -179,44 +185,52 @@ is_processing_lock = threading.Lock()
 
 def process_queue():
     global is_processing
-
+    global is_processing_lock
+    print(transaction_queue.size())
     while True:
         with is_processing_lock:
-            is_processing = not transaction_queue.empty()
+            is_processing = False if transaction_queue.empty() else True
 
-        if is_processing:
+        if is_processing and not transaction_queue.empty():
+           
             transaction = transaction_queue.get()
             if transaction is None:
                 release_lock()
-                break
+                continue
 
             success = execute_transaction(transaction)
             if not success:
                 # Re-enqueue if transaction failed
                 transaction['retries'] += 1
-                if transaction['retries'] <= 100000:  # To improve: rollback all transca
+                if transaction['retries'] <= 3:  # To improve: rollback all transca
                     transaction_queue.put(transaction)
                 else:
                     print(f"Transaction failed after retries: {transaction}")
             transaction_queue.task_done()
 
         with is_processing_lock:
-            is_processing = not transaction_queue.empty()    
+            is_processing = not transaction_queue.empty()  
+        
+        with is_processing_lock:
+            if not is_processing:
+                release_lock()
 
 
+    
 def execute_transaction(transaction):
     try:
-        if node == "node1":
+        if transaction['target_node'] == "node1":
             connection = get_node1_connection()
-        elif node == "node2":
+        elif transaction['target_node'] == "node2":
             connection = get_node2_connection()
         else:
             connection = get_node3_connection()
-            
+        print(transaction)
+        cursor = connection.cursor()    
         cursor.execute(transaction['query'], tuple(transaction['params'].values()))
-        conn.commit()
+        connection.commit()
         cursor.close()
-        conn.close()
+        connection.close()
         print(f"Transaction succeeded: {transaction}")
         return True
         
@@ -235,7 +249,11 @@ def execute_query(node, query, params=()):
 
         cursor = connection.cursor()
         # Params is a single value that we tuple
-        cursor.execute(query, (params,))
+        if params == ():
+            cursor.execute(query)
+        else:
+            cursor.execute(query, (params,))
+            
         results = cursor.fetchall()
         cursor.close()
         connection.close()
@@ -260,7 +278,7 @@ def add_transaction():
             return jsonify({"status": "error", "message": "Unable to acquire lock."}), 503
 
         data = request.json
-        transactions = data['transactions']
+        transactions = data
 
         for transaction in transactions:
             tx = {
@@ -273,13 +291,16 @@ def add_transaction():
             
         return jsonify({"status": "queued", "transaction": transaction}), 200
     except Exception as e:
+        print(traceback.format_exc())
         return jsonify({"status": "error", "message": "Failed to acquire lock. Please try again later."}), 503
 
 @app.route('/select', methods=['POST'])
 def run_query():
+    print(transaction_queue.qsize())
     global is_processing
 
     with is_processing_lock:
+        print(is_processing)
         if is_processing:
             return jsonify({"status": "busy", "message": "Server is processing transactions. Try again later."}), 503
 
@@ -292,6 +313,7 @@ def run_query():
         return jsonify({"status": "error", "message": "Query and target node are required"}), 400
 
     if check_lock():
+        print(params)
         result = execute_query(target_node, query, params)
         return jsonify(result), 200 if result['status'] == 'success' else 500
     else:

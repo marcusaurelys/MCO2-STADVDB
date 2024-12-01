@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+import traceback
  
 url = st.secrets['url']
 
@@ -33,6 +34,7 @@ if action == "View Games":
             raise Exception(response['message'])
 
         games_df = pd.DataFrame(response['results'])
+        games_df = games_df[['AppID', 'Name', 'Price', 'Developers', 'Publishers', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']]
         AgGrid(games_df, width=150)
     except Exception as e:
         st.error(f"Error: {str(e)}")
@@ -41,7 +43,7 @@ if action == "View Games":
 elif action == "Add Game":
     st.header("➕ Add a New Game")
     with st.form("add_game_form", clear_on_submit=True):
-        id = st.number_input("App ID")
+        id = st.number_input("App ID", step=1, value=0)
         name = st.text_input("Game Name")
         price = st.number_input("Price ($)", min_value=0.0, format="%.2f")
         developers = st.text_input("Developers")
@@ -49,7 +51,7 @@ elif action == "Add Game":
         languages = st.text_input("Languages (comma-separated, up to 3)")
         genres = st.text_input("Genres (comma-separated, up to 3)")
         platforms = st.multiselect("Platforms", ["Windows", "Mac", "Linux"])
-        release_date = st.date_input()
+        release_date = st.date_input("Release Date")
         submitted = st.form_submit_button("Add Game")
 
         if submitted:
@@ -57,7 +59,7 @@ elif action == "Add Game":
             mac = "Mac" in platforms
             linux = "Linux" in platforms
 
-            insert_query = """
+            query = """
                 INSERT INTO games (AppID, Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux, `Release date`)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             """
@@ -84,8 +86,9 @@ elif action == "Add Game":
                 endpoint = url + '/write'
                 tx1 = {}
                 tx2 = {}
-    
-                if params['release_date'] < 2020:
+                release_year = params['release_date'].year
+                params['release_date'] = params['release_date'].isoformat()
+                if release_year < 2020:
                     tx1 = {
                         "query": query,
                         "params": params,
@@ -120,6 +123,7 @@ elif action == "Add Game":
             
                 st.success(f"Game '{name}' added to queue!")
             except Exception as e:
+                print(traceback.format_exc())
                 st.error(f"Error: {str(e)}")
 
 # update operation
