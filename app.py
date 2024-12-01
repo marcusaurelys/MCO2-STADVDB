@@ -235,7 +235,8 @@ elif action == "Update Game":
                         
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
-                        
+        else:
+            st.warning("No game found with the provided AppID.")
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
