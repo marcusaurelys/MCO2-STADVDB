@@ -48,7 +48,6 @@ elif action == 'Search Game':
         data = {
             "query": query,
             "params": game_id,
-            "target_node": "node1"
         }
         response = requests.post(endpoint, json=data)
         response = response.json()
@@ -117,16 +116,11 @@ elif action == "Add Game":
 
             try:
                 endpoint = url + '/write'
-                tx1 = {}
                 tx2 = {}
                 release_year = params['release_date'].year
                 params['release_date'] = params['release_date'].isoformat()
                 if release_year < 2020:
-                    tx1 = {
-                        "query": query,
-                        "params": params,
-                        "target_node": "node1"
-                    }
+
 
                     tx2 = {
                         "query": query,
@@ -134,11 +128,7 @@ elif action == "Add Game":
                         "target_node": "node2"
                     }
                 else:
-                    tx1 = {
-                        "query": query,
-                        "params": params,
-                        "target_node": "node1"
-                    }
+
 
                     tx2 = {
                         "query": query,
@@ -146,9 +136,8 @@ elif action == "Add Game":
                         "target_node": "node3"
                     }
 
-                transactions = [tx1, tx2]
                 
-                response = requests.post(endpoint, json=transactions)
+                response = requests.post(endpoint, json=tx2)
                 response = response.json()
 
                 if response['status'] != "queued":
@@ -171,7 +160,6 @@ elif action == "Update Game":
         data = {
             "query": query,
             "params": game_id,
-            "target_node": "node1"
         }
         response = requests.post(endpoint, json=data)
         response = response.json()
@@ -211,7 +199,6 @@ elif action == "Update Game":
                     
                     try:
                         endpoint = url + '/write'
-                        tx1 = {}
                         tx2 = {}
 
                         params = {
@@ -233,11 +220,6 @@ elif action == "Update Game":
 
                         game_to_update['Release date'] = pd.to_datetime(game_to_update['Release date'], errors='coerce').dt.year
                         if game_to_update.iloc[0]['Release date'] < 2020:
-                            tx1 = {
-                                "query": query,
-                                "params": params,
-                                "target_node": "node1"
-                            }
 
                             tx2 = {
                                 "query": query,
@@ -245,11 +227,6 @@ elif action == "Update Game":
                                 "target_node": "node2"
                             }
                         else:
-                            tx1 = {
-                                "query": query,
-                                "params": params,
-                                "target_node": "node1"
-                            }
 
                             tx2 = {
                                 "query": query,
@@ -257,9 +234,9 @@ elif action == "Update Game":
                                 "target_node": "node3"
                             }
 
-                        transactions = [tx1, tx2]
+
                 
-                        response = requests.post(endpoint, json=transactions)
+                        response = requests.post(endpoint, json=tx2)
                         response = response.json()
 
                         if response['status'] != "queued":
@@ -287,7 +264,6 @@ elif action == "Delete Game":
         data = {
             "query": query,
             "params": game_id,
-            "target_node": "node1"
         }
         response = requests.post(endpoint, json=data)
         response = response.json()
@@ -308,18 +284,12 @@ elif action == "Delete Game":
 
             game_to_delete['Release date'] = pd.to_datetime(game_to_delete['Release date'], errors='coerce').dt.year
             endpoint = url + '/write'
-            tx1 = {}
             tx2 = {}
             params = {
                 "AppID": game_id
             }
             
             if game_to_delete.iloc[0]['Release date'] < 2020:
-                tx1 = {
-                    "query": query,
-                    "params": params,
-                    "target_node": "node1"
-                }
 
                 tx2 = {
                     "query": query,
@@ -327,11 +297,6 @@ elif action == "Delete Game":
                     "target_node": "node2"
                 }
             else:
-                tx1 = {
-                    "query": query,
-                    "params": params,
-                    "target_node": "node1"
-                }
 
                 tx2 = {
                     "query": query,
@@ -339,9 +304,8 @@ elif action == "Delete Game":
                     "target_node": "node3"
                 }
 
-            transactions = [tx1, tx2]
     
-            response = requests.post(endpoint, json=transactions)
+            response = requests.post(endpoint, json=tx2)
             response = response.json()
 
             if response['status'] != "queued":
