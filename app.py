@@ -38,8 +38,8 @@ if action == "View Games":
     except Exception as e:
         st.error(f"Error: {str(e)}")
     
-elif action == 'Search one Game':
-    st.header("🔎 Search one game")
+elif action == 'Search Game':
+    st.header("🔎 Search Game")
     game_id = st.number_input("Enter the AppID of the game to update", min_value=1, step=1)
     query = "SELECT * FROM games WHERE AppID = %s;"
 
