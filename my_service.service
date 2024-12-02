@@ -7,7 +7,6 @@ ExecStart=/bin/bash -c "streamlit run /root/MCO2-STADVDB/app.py --server.port 80
 Restart=always
 User=root
 WorkingDirectory=/root/MCO2-STADVDB
-Environment="PATH=/root/MCO2-STADVDB/venv/bin"
 
 [Install]
 WantedBy=multi-user.target
