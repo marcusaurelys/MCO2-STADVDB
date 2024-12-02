@@ -63,6 +63,7 @@ elif action == 'Search Game':
             st.warning("No game found with the provided AppID.")
         else:
             game_to_view = game_to_view[['AppID', 'Name', 'About the game', 'Developers', 'Publishers', 'Release date', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']] 
+            game_to_view = game_to_view.T
             st.dataframe(game_to_view)
 
     except Exception as e:
