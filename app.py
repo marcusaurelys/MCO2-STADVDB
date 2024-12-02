@@ -10,7 +10,7 @@ st.title("🎮 Steam Games Management System")
 st.markdown('<style> div.block-container{padding-top:2rem;}</style>', unsafe_allow_html=True)
 
 #Sidebar
-action = st.sidebar.selectbox("Choose an action", ["View Games", "Add Game", "Update Game", "Delete Game"])
+action = st.sidebar.selectbox("Choose an action", ["View Games", "Search Game", "Add Game", "Update Game", "Delete Game"])
 
 # read operation
 if action == "View Games":
@@ -37,6 +37,36 @@ if action == "View Games":
         st.dataframe(games_df)
     except Exception as e:
         st.error(f"Error: {str(e)}")
+    
+elif action == 'Search one Game':
+    st.header("🔎 Search one game")
+    game_id = st.number_input("Enter the AppID of the game to update", min_value=1, step=1)
+    query = "SELECT * FROM games WHERE AppID = %s;"
+
+    try:
+        endpoint = url + '/select'
+        data = {
+            "query": query,
+            "params": game_id,
+            "target_node": "node1"
+        }
+        response = requests.post(endpoint, json=data)
+        response = response.json()
+
+        if response['status'] != "success":
+            raise Exception(response['message'])
+
+        game_to_view = pd.DataFrame(response['results'])
+        
+        if game_to_view.empty:
+            st.warning("No game found with the provided AppID.")
+        else:
+            st.dataframe(game_to_view)
+
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+     
+
 
 #create operation
 elif action == "Add Game":
