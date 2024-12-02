@@ -64,7 +64,7 @@ elif action == 'Search Game':
         else:
             game_to_view = game_to_view[['AppID', 'Name', 'About the game', 'Developers', 'Publishers', 'Release date', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']] 
             game_to_view = game_to_view.T
-            st.dataframe(game_to_view)
+            st.dataframe(game_to_view, width=150)
 
     except Exception as e:
         st.error(f"Error: {str(e)}")
