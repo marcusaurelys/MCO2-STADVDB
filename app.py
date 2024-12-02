@@ -28,12 +28,11 @@ if action == "View Games":
         }
         response = requests.post(endpoint, json=data)
         response = response.json()
-
-        st.text(response)
-        if response['status'] != "success":
+        if response['status'] == "error":
             raise Exception(response['message'])
-
-        games_df = pd.DataFrame(response['results']) if len(response['results']) == 1 else pd.DataFrame(response['results'][0]).concat(response['results'][1])
+        if response['status'] == "warning":
+            st.warning("Warning: Data may not be complete!")
+        games_df = pd.DataFrame(response['results'])
         games_df = games_df[['AppID', 'Name', 'Price', 'Release date', 'Developers', 'Publishers', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']]
         st.dataframe(games_df)
     except Exception as e:
@@ -54,9 +53,10 @@ elif action == 'Search Game':
         response = requests.post(endpoint, json=data)
         response = response.json()
 
-        if response['status'] != "success":
+        if response['status'] == "error":
             raise Exception(response['message'])
-
+        if response['status'] == 'warning':
+            st.warning("Warning: Data may not be complete!")
         game_to_view = pd.DataFrame(response['results'])
 
         
