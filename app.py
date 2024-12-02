@@ -16,7 +16,7 @@ action = st.sidebar.selectbox("Choose an action", ["View Games", "Search Game", 
 if action == "View Games":
     st.header("View All Games")
     query = """
-        SELECT `AppID`, `Name`, `Release date` `Price`, `Developers`, `Publishers`, `Language 1`, `Language 2`, `Language 3`, 
+        SELECT `AppID`, `Name`, `Release date`, `Price`, `Developers`, `Publishers`, `Language 1`, `Language 2`, `Language 3`, 
                `Genre 1`, `Genre 2`, `Genre 3`, `Windows`, `Mac`, `Linux`
         FROM games;
     """
