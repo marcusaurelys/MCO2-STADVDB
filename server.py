@@ -26,7 +26,7 @@ node2_password = "password"
 node3_host = "10.2.0.206"
 node3_user = "user"
 node3_port = 3306
-    node3_password = "password"
+node3_password = "password"
 
 ##### Connections
 def get_node1_connection():
