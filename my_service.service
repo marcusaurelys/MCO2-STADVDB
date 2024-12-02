@@ -5,9 +5,9 @@ After=network.target
 [Service]
 ExecStart=/bin/bash -c "streamlit run /root/MCO2-STADVDB/app.py --server.port 80 & flask --app /root/MCO2-STADVDB/server run -p 5000"
 Restart=always
-User=your_username
-WorkingDirectory=/path/to/working/directory
-Environment="PATH=/path/to/your/python/environment/bin"
+User=root
+WorkingDirectory=/root/MCO2-STADVDB
+Environment="PATH=/root/MCO2-STADVDB/venv/bin"
 
 [Install]
 WantedBy=multi-user.target
