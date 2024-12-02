@@ -34,7 +34,7 @@ if action == "View Games":
 
         games_df = pd.DataFrame(response['results'])
         games_df = games_df[['AppID', 'Name', 'Price', 'Release date', 'Developers', 'Publishers', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']]
-        st.dataframe(games_df)
+        st.dataframe(games_df, width=150)
     except Exception as e:
         st.error(f"Error: {str(e)}")
     
