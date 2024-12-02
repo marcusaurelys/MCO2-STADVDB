@@ -378,6 +378,7 @@ def execute_transaction(transaction):
 
             cursor_master.execute(update_checkpoint_query, timestamp)
             cursor_slave.execute(update_checkpoint_query, timestamp)
+            cursor_other.execute(update_checkpoint_query, timestamp)
         except Exception as e:
             master_connection.rollback()
             slave_connection.rollback()
