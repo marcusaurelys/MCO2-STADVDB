@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import pymysql
 import traceback
+import pandas as pd
 
 from dotenv import load_dotenv
 import os
@@ -157,7 +158,13 @@ def release_lock():
 
     print(f"Lock released by {current_node}")
 
-def check_lock():
+def check_lock(conn):
+
+    conns = {
+        "node1": get_node1_connection(),
+        "node2": get_node2_connection(),
+        "node3": get_node3_connection()
+    }
     
     lock = "database_lock"
     select_lock = """
@@ -166,7 +173,7 @@ def check_lock():
     """
     print("checking lock")
     try:
-        connection = get_node1_connection()
+        connection = conns[conn]
         cursor = connection.cursor()
 
         cursor.execute(select_lock, (lock,))
@@ -317,9 +324,22 @@ def run_query():
     if not query or not target_node:
         return jsonify({"status": "error", "message": "Query and target node are required"}), 400
 
-    if check_lock():
+    if get_node1_connection() and check_lock('node1'):
         result = execute_query(target_node, query, params)
-        return jsonify(result), 200 if result['status'] == 'success' else 500
+        return jsonify(result), 200 if result['status'] == 'success' else 500    
+    elif not get_node1_connection():
+        result2 = None
+        result3 = None
+        to_return = []
+        if get_node2_connection() and check_lock('node2'):
+            result2 = execute_query('node2', query, params)
+        if get_node3_connection() and check_lock('node3'):
+            result3 = execute_query('node3', query, params)
+        if result2:
+            to_return.append(result2)
+        elif result3:
+            to_return.append(result3)
+            return jsonify(to_return), 200 if result2['status'] == 'success' or result3['status'] == 'success' else jsonify({"status": "error", "message": "Unable to connect to any of the databases. Try again later"}), 500
     else:
         return jsonify({"status": "error", "message": "Database is currently syncing"}), 500
     
