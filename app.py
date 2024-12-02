@@ -32,6 +32,8 @@ if action == "View Games":
         if response['status'] != "success":
             raise Exception(response['message'])
 
+        st.text(response)
+
         games_df = pd.DataFrame(response['results']) if len(response['results']) == 1 else pd.DataFrame(response['results'][0]).concat(response['results'][1])
         games_df = games_df[['AppID', 'Name', 'Price', 'Release date', 'Developers', 'Publishers', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']]
         st.dataframe(games_df)
