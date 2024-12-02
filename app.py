@@ -57,11 +57,12 @@ elif action == 'Search Game':
             raise Exception(response['message'])
 
         game_to_view = pd.DataFrame(response['results'])
-        game_to_view = game_to_view[['AppID', 'Name', 'About the game', 'Developers', 'Publishers', 'Release date', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']] 
+
         
         if game_to_view.empty:
             st.warning("No game found with the provided AppID.")
         else:
+            game_to_view = game_to_view[['AppID', 'Name', 'About the game', 'Developers', 'Publishers', 'Release date', 'Language 1', 'Language 2', 'Language 3', 'Genre 1', 'Genre 2', 'Genre 3', 'Windows', 'Mac', 'Linux']] 
             st.dataframe(game_to_view)
 
     except Exception as e:
