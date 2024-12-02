@@ -160,12 +160,6 @@ def release_lock():
 
 def check_lock(conn):
 
-    conns = {
-        "node1": get_node1_connection(),
-        "node2": get_node2_connection(),
-        "node3": get_node3_connection()
-    }
-    
     lock = "database_lock"
     select_lock = """
     SELECT locked_by, lock_time FROM distributed_lock
@@ -173,8 +167,7 @@ def check_lock(conn):
     """
     print("checking lock")
     try:
-        connection = conns[conn]
-        cursor = connection.cursor()
+        cursor = conn.cursor()
 
         cursor.execute(select_lock, (lock,))
         result = cursor.fetchone()
@@ -245,15 +238,10 @@ def execute_transaction(transaction):
         print(f"Transaction failed: {transaction}, Error: {e}")
         return False
     
-def execute_query(node, query, params=()):
+def execute_query(connection, query, params=()):
     try:
-        if node == "node1":
-            connection = get_node1_connection()
-        elif node == "node2":
-            connection = get_node2_connection()
-        else:
-            connection = get_node3_connection()
-
+        if not check_lock(connection):
+            raise Exception("Table locked!")
         cursor = connection.cursor()
         # Params is a single value that we tuple
         if params == ():
@@ -324,23 +312,29 @@ def run_query():
     if not query or not target_node:
         return jsonify({"status": "error", "message": "Query and target node are required"}), 400
 
-    if get_node1_connection() and check_lock('node1'):
-        result = execute_query(target_node, query, params)
-        return jsonify(result), 200 if result['status'] == 'success' else 500    
-    elif not get_node1_connection():
-        result2 = None
-        result3 = None
-        to_return = []
-        if get_node2_connection() and check_lock('node2'):
-            result2 = execute_query('node2', query, params)
-        if get_node3_connection() and check_lock('node3'):
-            result3 = execute_query('node3', query, params)
-        if result2:
-            to_return.append(result2)
-        elif result3:
-            to_return.append(result3)
-            return jsonify(to_return), 200 if result2['status'] == 'success' or result3['status'] == 'success' else jsonify({"status": "error", "message": "Unable to connect to any of the databases. Try again later"}), 500
-    else:
+    try:
+        
+        result = execute_query(get_node1_connection(), query, params)
+        if result['status'] == 'success':
+            return jsonify(result), 200    
+        else:
+            result2 = None
+            result3 = None
+            to_return = []
+            result2 = execute_query(get_node2_connection(), query, params)
+            result3 = execute_query(get_node3_connection(), query, params)
+            if result2['status'] == 'success':
+                print(type(result2['results']))
+                to_return = to_return + result2['results']
+            elif result3['status'] == 'success':
+                print(type(result3['results']))
+                to_return = to_return + result3['results']
+            print(to_return)
+            if result2['status'] == 'success' or result3['status'] == 'success':
+                return jsonify({ "status": "warning", "results": to_return}), 200  
+            else:
+                return jsonify({"status": "error", "message": "Unable to connect to any of the databases. Try again later"}), 500
+    except Exception as e:
         return jsonify({"status": "error", "message": "Database is currently syncing"}), 500
     
 @app.route('/testing', methods=['GET'])
