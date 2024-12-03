@@ -120,27 +120,21 @@ elif action == "Add Game":
                 release_year = params['release_date'].year
                 params['release_date'] = params['release_date'].isoformat()
                 if release_year < 2020:
-
-
                     tx2 = {
                         "query": query,
                         "params": params,
                         "target_node": "node2"
                     }
                 else:
-
-
                     tx2 = {
                         "query": query,
                         "params": params,
                         "target_node": "node3"
                     }
-
-                
                 response = requests.post(endpoint, json=tx2)
                 response = response.json()
 
-                if response['status'] != "queued":
+                if response['status'] != "success":
                     raise Exception(response['message'])
             
                 st.success(f"Game '{name}' added to queue!")
@@ -220,7 +214,6 @@ elif action == "Update Game":
 
                         game_to_update['Release date'] = pd.to_datetime(game_to_update['Release date'], errors='coerce').dt.year
                         if game_to_update.iloc[0]['Release date'] < 2020:
-
                             tx2 = {
                                 "query": query,
                                 "params": params,
@@ -233,16 +226,13 @@ elif action == "Update Game":
                                 "params": params,
                                 "target_node": "node3"
                             }
-
-
-                
                         response = requests.post(endpoint, json=tx2)
                         response = response.json()
 
-                        if response['status'] != "queued":
+                        if response['status'] != "success":
                             raise Exception(response['message'])
 
-                        st.success("Game update added to queue!")
+                        st.success("Game updated!")
                         
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
@@ -303,15 +293,13 @@ elif action == "Delete Game":
                     "params": params,
                     "target_node": "node3"
                 }
-
-    
             response = requests.post(endpoint, json=tx2)
             response = response.json()
 
-            if response['status'] != "queued":
+            if response['status'] != "success":
                 raise Exception(response['message'])
 
-            st.success("Game queued for deletion")
+            st.success("Game deleted")
 
         except ValueError as e:
             st.warning("No game found with the provided AppID.")
