@@ -3,7 +3,7 @@ Description=Run Streamlit and Flask Applications
 After=network.target
 
 [Service]
-ExecStart=/bin/bash -c "streamlit run /root/MCO2-STADVDB/app.py --server.port 80 & python /root/MCO2-STADVDB/server.py"
+	ExecStart=/bin/bash -c "streamlit run /root/MCO2-STADVDB/app.py --server.port 80 & python3 /root/MCO2-STADVDB/server.py"
 Restart=always
 User=root
 WorkingDirectory=/root/MCO2-STADVDB
