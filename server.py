@@ -15,19 +15,19 @@ import ast
 load_dotenv()
 current_node = os.getenv('current_user')
 
-node1_host = "ccscloud.dlsu.edu.ph"
-node1_port = 22042
+node1_host = "10.2.0.204"
+node1_port = 3306
 node1_user = "user"
 node1_password = "password"
 
-node2_host = "ccscloud.dlsu.edu.ph"
+node2_host = "10.2.0.205"
 node2_user = "user"
-node2_port = 22052
+node2_port = 3306
 node2_password = "password"
 
-node3_host = "ccscloud.dlsu.edu.ph"
+node3_host = "10.2.0.206"
 node3_user = "user"
-node3_port = 22062
+node3_port = 3306
 node3_password = "password"
 ##### Connections
 def get_node1_connection():
