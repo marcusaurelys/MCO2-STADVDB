@@ -325,7 +325,7 @@ def recover():
                             curr_time = datetime.datetime().now()
                             cursor_self.execute(update_checkpoint_query, (curr_time,))
                             print(f"Checkpoint updated")
-                        elif log['node'] == current_node:
+                        elif log['node'] == int(current_node[-1]):
                             cursor_self.execute(log['query'], ast.literal_eval(log['params']))
                             print(f"Transaction done")
                             curr_time = datetime.datetime().now()
@@ -410,9 +410,9 @@ def execute_transaction_down_one_committing(master_connection, slave_other, tran
         try:    
             # Update logs
             timestamp = datetime.datetime.now()
-            cursor_master.execute(update_log_query, (transaction['target_node'], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
+            cursor_master.execute(update_log_query, (transaction['target_node'][-1], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
             print("Logs updated on primary")
-            cursor_other.execute(update_log_query, (transaction['target_node'], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
+            cursor_other.execute(update_log_query, (transaction['target_node'][-1], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
             print("Logs updated on other")
             # Execute transaction
             cursor_master.execute(transaction['query'], tuple(transaction['params'].values()))
@@ -477,9 +477,9 @@ def execute_transaction_down_non_committing(master_connection, slave_connection,
         try:
             # Update logs
             timestamp = datetime.datetime.now()
-            cursor_slave.execute(update_log_query, (transaction['target_node'], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
+            cursor_slave.execute(update_log_query, (transaction['target_node'][-1], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
             print("Logs updated on slave")
-            cursor_master.execute(update_log_query, (transaction['target_node'], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
+            cursor_master.execute(update_log_query, (transaction['target_node'][-1], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
             print("Logs updated on master")
             # Execute transactions
             cursor_slave.execute(transaction['query'], tuple(transaction['params'].values()))
@@ -500,7 +500,7 @@ def execute_transaction_down_non_committing(master_connection, slave_connection,
                 master_connection.rollback()
             if slave_connection.open:
                 slave_connection.rollback()
-            print(f"Transaction failed: {transaction}")
+            print(f"Transaction failed: {e}")
             return False
     
         cursor_slave.close()
@@ -520,7 +520,7 @@ def execute_transaction_down_non_committing(master_connection, slave_connection,
             master_connection.rollback()
         if slave_connection.open:
             slave_connection.rollback()
-        print(f"Transaction failed: {transaction}")
+        print(f"Transaction failed: {e}")
         return False
 
 def execute_transaction(transaction):
@@ -567,7 +567,8 @@ def execute_transaction(transaction):
         locked_slave = acquire_lock(3, slave_connection)
         locked_other = acquire_lock(3, slave_other)
 
-        if not locked_master or not locked_slave or not locked_other:            
+        if not locked_master or not locked_slave or not locked_other:
+            print(f"Failed to acquire locks: master: {locked_master}, slave: {locked_slave}, other: {locked_other}")            
             release_lock(master_connection)
             release_lock(slave_connection)
             release_lock(slave_other)
@@ -584,11 +585,11 @@ def execute_transaction(transaction):
         try:
             # Update the logs of all nodes with the transaction
             timestamp = datetime.datetime.now()
-            cursor_master.execute(update_log_query, (transaction['target_node'], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
+            cursor_master.execute(update_log_query, (transaction['target_node'][-1], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
             print("Logs updated on master")
-            cursor_slave.execute(update_log_query, (transaction['target_node'], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
+            cursor_slave.execute(update_log_query, (transaction['target_node'][-1], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
             print("Logs updated on slave")
-            cursor_other.execute(update_log_query, (transaction['target_node'], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
+            cursor_other.execute(update_log_query, (transaction['target_node'][-1], timestamp, transaction['query'], str(tuple(transaction['params'].values()))))
             print("Logs updated on other")
 
             # We execute the transaction on the master node and the target node
@@ -608,6 +609,7 @@ def execute_transaction(transaction):
         except Exception as e:
             # We rollback then return failure on transaction.
             # We failed to commit a part of the transaction so everything must be rolled back.
+            print("Error while transmitting transactions")
             release_lock(master_connection)
             release_lock(slave_connection)
             release_lock(slave_other)
@@ -617,7 +619,7 @@ def execute_transaction(transaction):
                 slave_connection.rollback()
             if slave_other.open:
                 slave_other.rollback()
-            print(f"Transaction failed: {transaction}")
+            print(f"Transaction failed: {e}")
             return False
 
         # We succeeded on the transactions
@@ -636,6 +638,7 @@ def execute_transaction(transaction):
         
     except Exception as e:
         # We somehow failed during the commit
+        print("Error while committing")
         release_lock(master_connection)
         release_lock(slave_connection)
         release_lock(slave_other)
