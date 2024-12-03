@@ -687,9 +687,9 @@ def add_transaction():
     result = execute_transaction(transaction)
 
     if result: 
-        return jsonify({"status": success, "transaction": transaction}), 200
+        return jsonify({"status": "success", "transaction": transaction}), 200
     else:
-        return jsonify({"status": success, "message": "Database is currently busy"}), 200
+        return jsonify({"status": "error", "message": "Database is currently busy"}), 200
 
 @app.route('/select', methods=['POST'])
 def run_query():
