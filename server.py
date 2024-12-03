@@ -375,7 +375,7 @@ def recover():
                         self_connection.rollback()
                     if other_connection_1:
                         other_connection_1.rollback()
-                    if other_connection_2
+                    if other_connection_2:
                         other_connection_2.rollback()
                     release_lock(self_connection)
                     release_lock(other_connection_1)
@@ -390,7 +390,7 @@ def recover():
                     self_connection.rollback()
                 if other_connection_1:
                     other_connection_1.rollback()
-                if other_connection_2
+                if other_connection_2:
                     other_connection_2.rollback()
                 release_lock(self_connection)
                 release_lock(other_connection_1)
@@ -406,7 +406,7 @@ def recover():
                 self_connection.rollback()
             if other_connection_1:
                 other_connection_1.rollback()
-            if other_connection_2
+            if other_connection_2:
                 other_connection_2.rollback()
             release_lock(self_connection)
             release_lock(other_connection_1)
