@@ -371,9 +371,12 @@ def recover():
             
                 except Exception as e:
                     print(f"Error occurred while recovering, trying again: {e}")
-                    self_connection.rollback()
-                    other_connection_1.rollback()
-                    other_connection_2.rollback()
+                    if self_connection:
+                        self_connection.rollback()
+                    if other_connection_1:
+                        other_connection_1.rollback()
+                    if other_connection_2
+                        other_connection_2.rollback()
                     release_lock(self_connection)
                     release_lock(other_connection_1)
                     release_lock(other_connection_2)
@@ -383,9 +386,12 @@ def recover():
             else:
                 # We didn't acquire all the locks
                 print(f"Not all locks acquired, releasing all locks then waiting")
-                self_connection.rollback()
-                other_connection_1.rollback()
-                other_connection_2.rollback()
+                if self_connection:
+                    self_connection.rollback()
+                if other_connection_1:
+                    other_connection_1.rollback()
+                if other_connection_2
+                    other_connection_2.rollback()
                 release_lock(self_connection)
                 release_lock(other_connection_1)
                 release_lock(other_connection_2)
@@ -396,9 +402,12 @@ def recover():
 
         except Exception as e:
             print(f"Error occurred while recovering, trying again: {e}")
-            self_connection.rollback()
-            other_connection_1.rollback()
-            other_connection_2.rollback()
+            if self_connection:
+                self_connection.rollback()
+            if other_connection_1:
+                other_connection_1.rollback()
+            if other_connection_2
+                other_connection_2.rollback()
             release_lock(self_connection)
             release_lock(other_connection_1)
             release_lock(other_connection_2)
