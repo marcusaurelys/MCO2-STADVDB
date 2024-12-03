@@ -530,6 +530,7 @@ def execute_transaction(transaction):
     try:
         # transaction['target_node'] -- node2 or node3
         # Lock master and target node
+        print("In transaction")
         master_connection = None
         slave_connection = None
         slave_other = None
@@ -689,7 +690,7 @@ def add_transaction():
     if result: 
         return jsonify({"status": "success", "transaction": transaction}), 200
     else:
-        return jsonify({"status": "error", "message": "Database is currently busy"}), 200
+        return jsonify({"status": "error", "message": "Database is currently busy"}), 500
 
 @app.route('/select', methods=['POST'])
 def run_query():
