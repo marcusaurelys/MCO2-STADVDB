@@ -530,6 +530,10 @@ def execute_transaction(transaction):
     try:
         # transaction['target_node'] -- node2 or node3
         # Lock master and target node
+        master_connection = None
+        slave_connection = None
+        slave_other = None
+        
         master_connection = get_node1_connection()
         if transaction['target_node'] == "node2":
             slave_connection = get_node2_connection()
