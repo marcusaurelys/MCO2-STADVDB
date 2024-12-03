@@ -567,7 +567,7 @@ def execute_transaction(transaction):
         locked_slave = acquire_lock(3, slave_connection)
         locked_other = acquire_lock(3, slave_other)
 
-        if not locked_master or not locked_slave or locked_other:            
+        if not locked_master or not locked_slave or not locked_other:            
             release_lock(master_connection)
             release_lock(slave_connection)
             release_lock(slave_other)
