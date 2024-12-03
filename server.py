@@ -673,7 +673,17 @@ app = Flask(__name__)
 def add_transaction():
 
     data = request.json
-    transaction = data.get('transaction')
+    query = data.get('query')
+    params = data.get('params')
+    target_node = data.get('target_node')
+
+    transaction = {
+        "query": query,
+        "params": params,
+        "target_node": target_node,
+    }
+    print(f"Transaction: {transaction}")
+        
     result = execute_transaction(transaction)
 
     if result: 
