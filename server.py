@@ -330,7 +330,7 @@ def recover():
                             print(new_tuple)
                             cursor_self.execute(log['query'], new_tuple)
                             print(f"Transaction done")
-                            curr_time = datetime.datetime().now()
+                            curr_time = datetime.datetime.now()
                             cursor_self.execute(update_checkpoint_query, (curr_time,))
                             print(f"Checkpoint updated")
                         elif log['node'] == int(current_node[-1]):
@@ -341,7 +341,7 @@ def recover():
                             print(new_tuple)
                             cursor_self.execute(log['query'], new_tuple)
                             print(f"Transaction done")
-                            curr_time = datetime.datetime().now()
+                            curr_time = datetime.datetime.now()
                             cursor_self.execute(update_checkpoint_query, (curr_time,))
                             print(f"Checkpoint updated")
 
