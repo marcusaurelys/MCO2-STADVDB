@@ -15,17 +15,17 @@ import ast
 load_dotenv()
 current_node = os.getenv('current_user')
 
-node1_host = "10.2.0.204"
+node1_host = "10.0.2.204"
 node1_port = 3306
 node1_user = "user"
 node1_password = "password"
 
-node2_host = "10.2.0.205"
+node2_host = "10.0.2.205"
 node2_user = "user"
 node2_port = 3306
 node2_password = "password"
 
-node3_host = "10.2.0.206"
+node3_host = "10.0.2.206"
 node3_user = "user"
 node3_port = 3306
 node3_password = "password"
@@ -42,6 +42,7 @@ def get_node1_connection():
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
         )
+        print(f"Connection autocommit: {connection1.get_autocommit()}")
         return connection1
     except Exception as e:
         print(f"Error connecting to node 1 database: {e}")
@@ -59,6 +60,7 @@ def get_node2_connection():
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
         )
+        print(f"Connection autocommit: {connection2.autocommit}")
         return connection2
     except Exception as e:
         print(f"Error connecting to node 2 database: {e}")
@@ -74,6 +76,7 @@ def get_node3_connection():
             database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False)
+        print(f"Connection autocommit: {connection3.autocommit}")
         return connection3
     except Exception as e:
         print(f"Error connecting to node 3 database: {e}")
@@ -320,19 +323,30 @@ def recover():
                         print(f"Log inserted")
                         # We are master node so we execute every query regardless
                         if current_node == "node1":
-                            cursor_self.execute(log['query'], ast.literal_eval(log['params']))
+                            params = ast.literal_eval(log['params'])
+                            last_element = params[-1]
+                            last_element_date = datetime.datetime.strptime(last_element, '%Y-%m-%d').date()
+                            new_tuple = params[:-1] + (last_element_date,)
+                            print(new_tuple)
+                            cursor_self.execute(log['query'], new_tuple)
                             print(f"Transaction done")
                             curr_time = datetime.datetime().now()
                             cursor_self.execute(update_checkpoint_query, (curr_time,))
                             print(f"Checkpoint updated")
                         elif log['node'] == int(current_node[-1]):
-                            cursor_self.execute(log['query'], ast.literal_eval(log['params']))
+                            params = ast.literal_eval(log['params'])
+                            last_element = params[-1]
+                            last_element_date = datetime.datetime.strptime(last_element, '%Y-%m-%d').date()
+                            new_tuple = params[:-1] + (last_element_date,)
+                            print(new_tuple)
+                            cursor_self.execute(log['query'], new_tuple)
                             print(f"Transaction done")
                             curr_time = datetime.datetime().now()
                             cursor_self.execute(update_checkpoint_query, (curr_time,))
                             print(f"Checkpoint updated")
 
                     # We succeeded and can commit everything YAY!!!
+                    print("committing")
                     self_connection.commit()
                     other_connection_1.commit()
                     other_connection_2.commit()
@@ -357,18 +371,21 @@ def recover():
             
                 except Exception as e:
                     print(f"Error occurred while recovering, trying again: {e}")
-                    release_lock(self_connection)
-                    release_lock(other_connection_1)
-                    release_lock(other_connection_2)
                     self_connection.rollback()
                     other_connection_1.rollback()
                     other_connection_2.rollback()
+                    release_lock(self_connection)
+                    release_lock(other_connection_1)
+                    release_lock(other_connection_2)
                     seconds = random.uniform(1,12)
                     print(f"Sleeping for {seconds} before trying again")
                     time.sleep(seconds)
             else:
                 # We didn't acquire all the locks
                 print(f"Not all locks acquired, releasing all locks then waiting")
+                self_connection.rollback()
+                other_connection_1.rollback()
+                other_connection_2.rollback()
                 release_lock(self_connection)
                 release_lock(other_connection_1)
                 release_lock(other_connection_2)
@@ -379,6 +396,9 @@ def recover():
 
         except Exception as e:
             print(f"Error occurred while recovering, trying again: {e}")
+            self_connection.rollback()
+            other_connection_1.rollback()
+            other_connection_2.rollback()
             release_lock(self_connection)
             release_lock(other_connection_1)
             release_lock(other_connection_2)
@@ -424,6 +444,8 @@ def execute_transaction_down_one_committing(master_connection, slave_other, tran
             print("Checkpoint updated on other")
         except Exception as e:
             # Rollback partial transaction
+            master_connection.rollback()
+            slave_other.rollback()
             release_lock(master_connection)
             release_lock(slave_other)
             if master_connection.open:
@@ -444,6 +466,8 @@ def execute_transaction_down_one_committing(master_connection, slave_other, tran
 
     except Exception as e:
         # Rollback partial transaction
+        master_connection.rollback()
+        slave_other.rollback()
         release_lock(master_connection)
         release_lock(slave_other)
         if master_connection.open:
@@ -494,6 +518,8 @@ def execute_transaction_down_non_committing(master_connection, slave_connection,
             
         except Exception as e:
             # Rollback partial transaction
+            master_connection.rollback()
+            slave_connection.rollback()
             release_lock(slave_connection)
             release_lock(master_connection)
             if master_connection.open:
@@ -514,6 +540,8 @@ def execute_transaction_down_non_committing(master_connection, slave_connection,
         
     except Exception as e:
         # We somehow failed during the commit
+        master_connection.rollback()
+        slave_connection.rollback()
         release_lock(slave_connection)
         release_lock(master_connection)
         if master_connection.open:
@@ -610,15 +638,15 @@ def execute_transaction(transaction):
             # We rollback then return failure on transaction.
             # We failed to commit a part of the transaction so everything must be rolled back.
             print("Error while transmitting transactions")
-            release_lock(master_connection)
-            release_lock(slave_connection)
-            release_lock(slave_other)
             if master_connection.open:
                 master_connection.rollback()
             if slave_connection.open:
                 slave_connection.rollback()
             if slave_other.open:
                 slave_other.rollback()
+            release_lock(master_connection)
+            release_lock(slave_connection)
+            release_lock(slave_other)
             print(f"Transaction failed: {e}")
             return False
 
@@ -639,15 +667,15 @@ def execute_transaction(transaction):
     except Exception as e:
         # We somehow failed during the commit
         print("Error while committing")
-        release_lock(master_connection)
-        release_lock(slave_connection)
-        release_lock(slave_other)
         if master_connection.open:
             master_connection.rollback()
         if slave_connection.open:
             slave_connection.rollback()
         if slave_other.open:
             slave_other.rollback()
+        release_lock(master_connection)
+        release_lock(slave_connection)
+        release_lock(slave_other)
         print(f"Transaction failed: {transaction}, Error: {e}")                
         return False
     
