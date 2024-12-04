@@ -42,7 +42,6 @@ def get_node1_connection():
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
         )
-        print(f"Connection autocommit: {connection1.get_autocommit()}")
         return connection1
     except Exception as e:
         print(f"Error connecting to node 1 database: {e}")
@@ -60,7 +59,6 @@ def get_node2_connection():
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False
         )
-        print(f"Connection autocommit: {connection2.autocommit}")
         return connection2
     except Exception as e:
         print(f"Error connecting to node 2 database: {e}")
@@ -76,7 +74,6 @@ def get_node3_connection():
             database='games',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False)
-        print(f"Connection autocommit: {connection3.autocommit}")
         return connection3
     except Exception as e:
         print(f"Error connecting to node 3 database: {e}")
@@ -186,7 +183,7 @@ def release_lock(connection):
         print("Tried to release lock on closed connection")
         return
 
-    print(f"trying to release lock on {connection.host}:{connection.port}")
+    print(f"Trying to release lock on {connection.host}:{connection.port}")
     try:
         cursor = connection.cursor()
 
@@ -205,7 +202,14 @@ def check_lock(conn):
     SELECT locked_by, lock_time FROM distributed_lock
     WHERE lock_name = %s
     """
-    print(f"checking if lock exists on {conn.host}:{conn.port}")
+    if not conn:
+        print("Tried to check lock on empty connection")
+        return False
+    elif not conn.open:
+        print("Tried to check lock on closed connection")
+        return False
+    
+    print(f"Checking if lock exists on {conn.host}:{conn.port}")
     try:
         cursor = conn.cursor()
 
@@ -229,7 +233,14 @@ def check_us_lock(conn):
     SELECT locked_by, lock_time FROM distributed_lock
     WHERE lock_name = %s
     """
-    print(f"checking if we {current_node} are the locker on {conn.host}:{conn.port}")
+    if not conn:
+        print("Tried to release lock on empty connection")
+        return False
+    elif not conn.open:
+        print("Tried to release lock on closed connection")
+        return False
+    
+    print(f"Checking if we {current_node} are the locker on {conn.host}:{conn.port}")
     try:
         cursor = conn.cursor()
 
@@ -475,14 +486,12 @@ def execute_transaction_down_one_committing(master_connection, slave_other, tran
 
     except Exception as e:
         # Rollback partial transaction
-        master_connection.rollback()
-        slave_other.rollback()
-        release_lock(master_connection)
-        release_lock(slave_other)
         if master_connection.open:
             master_connection.rollback()
         if slave_other.open:
             slave_other.rollback()
+        release_lock(master_connection)
+        release_lock(slave_other)
         print(f"Transaction failed: {transaction}")
         return False
 
@@ -527,14 +536,12 @@ def execute_transaction_down_non_committing(master_connection, slave_connection,
             
         except Exception as e:
             # Rollback partial transaction
-            master_connection.rollback()
-            slave_connection.rollback()
-            release_lock(slave_connection)
-            release_lock(master_connection)
             if master_connection.open:
                 master_connection.rollback()
             if slave_connection.open:
                 slave_connection.rollback()
+            release_lock(slave_connection)
+            release_lock(master_connection)
             print(f"Transaction failed: {e}")
             return False
     
@@ -549,14 +556,12 @@ def execute_transaction_down_non_committing(master_connection, slave_connection,
         
     except Exception as e:
         # We somehow failed during the commit
-        master_connection.rollback()
-        slave_connection.rollback()
-        release_lock(slave_connection)
-        release_lock(master_connection)
         if master_connection.open:
             master_connection.rollback()
         if slave_connection.open:
             slave_connection.rollback()
+        release_lock(slave_connection)
+        release_lock(master_connection)
         print(f"Transaction failed: {e}")
         return False
 
@@ -691,7 +696,7 @@ def execute_transaction(transaction):
 def execute_query(connection, query, params=()):
     try:
         if not check_lock(connection):
-            raise Exception("Table locked!")
+            raise Exception("Table locked or unavailable")
         cursor = connection.cursor()
         # Params is a single value that we tuple
         if params == ():
@@ -702,6 +707,9 @@ def execute_query(connection, query, params=()):
         results = cursor.fetchall()
         cursor.close()
         connection.close()
+        if isinstance(results, tuple):
+            return {"status": "success", "results": list(results)}
+        
         return {"status": "success", "results": results}
 
     except Exception as e:
@@ -753,17 +761,19 @@ def run_query():
             result2 = execute_query(get_node2_connection(), query, params)
             result3 = execute_query(get_node3_connection(), query, params)
             if result2['status'] == 'success':
-                print(type(result2['results']))
+                print("Node 2 online")
                 to_return = to_return + result2['results']
-            elif result3['status'] == 'success':
-                print(type(result3['results']))
+            
+            if result3['status'] == 'success':
+                print("Node 3 online")
                 to_return = to_return + result3['results']
-            print(to_return)
+                
             if result2['status'] == 'success' or result3['status'] == 'success':
                 return jsonify({ "status": "warning", "results": to_return}), 200  
             else:
                 return jsonify({"status": "error", "message": "Unable to connect to any of the databases. Try again later"}), 500
     except Exception as e:
+        print(f"Error: {e}")
         return jsonify({"status": "error", "message": "Database is currently syncing"}), 500
     
 if __name__ == '__main__':

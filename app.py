@@ -87,61 +87,86 @@ elif action == "Add Game":
         submitted = st.form_submit_button("Add Game")
 
         if submitted:
-            windows = "Windows" in platforms
-            mac = "Mac" in platforms
-            linux = "Linux" in platforms
-
-            query = """
-                INSERT INTO games (AppID, Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux, `Release date`)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-            """
-            
-            params = {
-                "id" : id,
-                "name": name,
-                "price": price,
-                "developers": developers,
-                "publishers": publishers,
-                "language_1": languages.split(",")[0] if languages else None,
-                "language_2": languages.split(",")[1] if len(languages.split(",")) >= 2 else None,
-                "language_3": languages.split(",")[2] if len(languages.split(",")) >= 3 else None,
-                "genre_1": genres.split(",")[0] if genres else None,
-                "genre_2": genres.split(",")[1] if len(genres.split(",")) >= 2 else None,
-                "genre_3": genres.split(",")[2] if len(genres.split(",")) >= 3 else None,
-                "windows": windows,
-                "mac": mac,
-                "linux": linux,
-                "release_date": release_date
-            }
 
             try:
-                endpoint = url + '/write'
-                tx2 = {}
-                release_year = params['release_date'].year
-                params['release_date'] = params['release_date'].isoformat()
-                if release_year < 2020:
-                    tx2 = {
+                query = "SELECT * FROM games WHERE AppID = %s;"
+                try:
+                    endpoint = url + '/select'
+                    data = {
                         "query": query,
-                        "params": params,
-                        "target_node": "node2"
+                        "params": id,
                     }
-                else:
-                    tx2 = {
-                        "query": query,
-                        "params": params,
-                        "target_node": "node3"
-                    }
-                response = requests.post(endpoint, json=tx2)
-                response = response.json()
+                    response = requests.post(endpoint, json=data)
+                    response = response.json()
 
-                if response['status'] != "success":
-                    raise Exception(response['message'])
+                    if response['status'] == "error":
+                        raise Exception(response['message'])
+
+                    game = pd.DataFrame(response['results'])
+
+                    if not game.empty:
+                        raise Exception(f"Game with that ID already exists")
+                        
+                except Exception as e:
+                    raise Exception(f"{e}")
+                
+                windows = "Windows" in platforms
+                mac = "Mac" in platforms
+                linux = "Linux" in platforms
+
+                query = """
+                    INSERT INTO games (AppID, Name, Price, Developers, Publishers, `Language 1`, `Language 2`, `Language 3`, `Genre 1`, `Genre 2`, `Genre 3`, Windows, Mac, Linux, `Release date`)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """
             
-                st.success(f"Game '{name}' added to queue!")
-            except Exception as e:
-                print(traceback.format_exc())
-                st.error(f"Error: {str(e)}")
+                params = {
+                    "id" : id,
+                    "name": name,
+                    "price": price,
+                    "developers": developers,
+                    "publishers": publishers,
+                    "language_1": languages.split(",")[0] if languages else None,
+                    "language_2": languages.split(",")[1] if len(languages.split(",")) >= 2 else None,
+                    "language_3": languages.split(",")[2] if len(languages.split(",")) >= 3 else None,
+                    "genre_1": genres.split(",")[0] if genres else None,
+                    "genre_2": genres.split(",")[1] if len(genres.split(",")) >= 2 else None,
+                    "genre_3": genres.split(",")[2] if len(genres.split(",")) >= 3 else None,
+                    "windows": windows,
+                    "mac": mac,
+                    "linux": linux,
+                    "release_date": release_date
+                }
 
+                try:
+                    endpoint = url + '/write'
+                    tx2 = {}
+                    release_year = params['release_date'].year
+                    params['release_date'] = params['release_date'].isoformat()
+                    if release_year < 2020:
+                        tx2 = {
+                            "query": query,
+                            "params": params,
+                            "target_node": "node2"
+                        }
+                    else:
+                        tx2 = {
+                            "query": query,
+                            "params": params,
+                            "target_node": "node3"
+                        }
+                    response = requests.post(endpoint, json=tx2)
+                    response = response.json()
+
+                    if response['status'] != "success":
+                        raise Exception(f"{response['message']}")
+            
+                    st.success(f"Game '{name}' added!")
+                except Exception as e:
+                    print(traceback.format_exc())
+                    st.error(f"Error: {str(e)}")
+            except Exception as e:
+                st.error(f"Error: {e}")
+                 
 # update operation
 elif action == "Update Game":
     st.header("✏️ Update Game Information")
